@@ -1,7 +1,7 @@
 local Render = {}
 
 local TILE = 100
-local GAP =  12
+local GAP = 12
 local TOP = 90
 
 local colors = {
@@ -29,7 +29,7 @@ function Render.load()
 end
 
 local function tileColor(v)
-    return colors[v] or {0.24, 0.23. 0.20}
+    return colors[v] or {0.24, 0.23, 0.20}
 end
 
 local function textColor(v)
@@ -37,27 +37,40 @@ local function textColor(v)
     return {0.98, 0.97, 0.95}
 end
 
+-- shrink the number as it gets more digits so it fits in the tile
+local function tileFont(v)
+    if v < 10000 then return fonts.big end
+    if v < 100000 then return fonts.med end
+    return fonts.small
+end
+
 local function drawHeader(board, best, w)
     love.graphics.setColor(0.47, 0.43, 0.40)
     love.graphics.setFont(fonts.big)
     love.graphics.print("2048", GAP, 20)
-    love.graphics.setFont(font.small)
-    love.graphics.printf("SCORE " .. board.SCORE, 0, 22, w - GAP, "right")
+    love.graphics.setFont(fonts.small)
+    love.graphics.printf("SCORE " .. board.score, 0, 22, w - GAP, "right")
     love.graphics.printf("BEST " .. best, 0, 46, w - GAP, "right")
 end
 
 local function drawGrid(board, w)
     love.graphics.setColor(0.73, 0.68, 0.63)
-    love.graphics.rectangle("fill", x, y, TITLE, TITLE, 6, 6)
-    if v > 0 then
-        local font = titleFont(v)
-        love.graphics.setFont(font)
-        love.graphics.setColor(textColor(v))
-        love.graphics.printf(tostring(v), x, y + (TITLE - font:getHeight()) / 2, TITLE, "center")
+    love.graphics.rectangle("fill", 0, TOP, w, w, 8, 8)
+    for r = 1, board.size do
+        for c = 1, board.size do
+            local v = board.cells[r][c]
+            local x = GAP + (c - 1) * (TILE + GAP)
+            local y = TOP + GAP + (r - 1) * (TILE + GAP)
+            love.graphics.setColor(tileColor(v))
+            love.graphics.rectangle("fill", x, y, TILE, TILE, 6, 6)
+            if v > 0 then
+                local font = tileFont(v)
+                love.graphics.setFont(font)
+                love.graphics.setColor(textColor(v))
+                love.graphics.printf(tostring(v), x, y + (TILE - font:getHeight()) / 2, TILE, "center")
+            end
+        end
     end
-end
-end
-end
 end
 
 local function drawOverlay(title, subtitle, w)
@@ -65,19 +78,19 @@ local function drawOverlay(title, subtitle, w)
     love.graphics.rectangle("fill", 0, TOP, w, w, 8, 8)
     love.graphics.setColor(0.47, 0.43, 0.40)
     love.graphics.setFont(fonts.big)
-    love.graphics.printf(title, 0, TOP + w / 2 + 10, w, "center")
+    love.graphics.printf(title, 0, TOP + w / 2 - 40, w, "center")
     love.graphics.setFont(fonts.small)
     love.graphics.printf(subtitle, 0, TOP + w / 2 + 10, w, "center")
 end
 
 function Render.draw(board, best, showWin)
-    local w = board.size * TITLE + (board.size + 1) * GAP
+    local w = board.size * TILE + (board.size + 1) * GAP
     drawHeader(board, best, w)
     drawGrid(board, w)
     if board.over then
-        drawOverlay("Game over :()", w)
+        drawOverlay("Game over :(", "Press R to restart", w)
     elseif showWin then
-        drawOverlay("You Win!!", w)
+        drawOverlay("You Win!!", "Press C to keep playing, R to restart", w)
     end
 end
 

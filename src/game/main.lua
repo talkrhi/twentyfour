@@ -29,13 +29,13 @@ function love.keypressed(key)
     elseif key == "r" then
         restart()
     elseif board.won and not keepPlaying then
-        if key == "c" then KeepPlaying true end
+        if key == "c" then keepPlaying = true end
     elseif keyMap[key] then
-        board:move(KeyMap[key])
+        board:move(keyMap[key])
         if board.score > best then best = board.score end
     end
 end
 
 function love.draw()
-    Render.draw(board, best, board.won and not KeepPlaying)
+    Render.draw(board, best, board.won and not keepPlaying)
 end
