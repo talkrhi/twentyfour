@@ -1,8 +1,7 @@
 local Render = {}
 
-local TILE = 100
-local GAP = 12
-local TOP = 90
+local TILE, GAP = 100, 12
+local HEADER = 0.22
 
 local colors = {
     [0]  = {0.80, 0.76, 0.71},
@@ -19,13 +18,49 @@ local colors = {
     [2048] = {0.93, 0.76, 0.18},
 }
 
-local fonts = {}
+local BOARD_COLOR = {0.73, 0.68, 0.63}
+local TEXT_COLOR = {0.47, 0.43, 0.40}
+
+local fontCache = {}
+
+local function round(n)
+    return math.floor(n + 0.5)
+end
+
+local function font(size)
+    size = math.max(6, round(size))
+    if not fontCache[size] then fontCache[size] = love.graphics.newFont(size) end
+    return fontCache[size]
+end
+
+local function fitFont(text, maxSize, width)
+    local f = font(maxSize)
+    local textWidth = f:getWidth(text)
+    if textWidth > width then f = font(maxSize * width / textWidth) end
+    return f
+end
 
 function Render.load()
     love.graphics.setBackgroundColor(0.98, 0.97, 0.94)
-    fonts.big = love.graphics.newFont(36)
-    fonts.med = love.graphics.newFont(24)
-    fonts.small = love.graphics.newFont(16)
+end
+
+function Render.resize()
+    fontCache = {}
+end
+
+local function layout(board)
+    local W, H = love.graphics.getDimensions()
+    local margin = math.min(W, H) * 0.04
+    local side = math.min(W - 2 * margin, (H - 2 * margin) / (1 + HEADER))
+    local scale = side / (board.size * TILE + (board.size + 1) * GAP)
+    local top = (H - side * (1 + HEADER)) / 2
+    return {
+        side = side,
+        x = round((W - side) / 2),
+        y = round(top + side * HEADER),
+        tile = TILE * scale,
+        gap = GAP * scale,
+    }
 end
 
 local function tileColor(v)
@@ -33,64 +68,74 @@ local function tileColor(v)
 end
 
 local function textColor(v)
-    if v <= 4 then return {0.47, 0.43, 0.40} end
+    if v <= 4 then return TEXT_COLOR end
     return {0.98, 0.97, 0.95}
 end
 
--- shrink the number as it gets more digits so it fits in the tile
-local function tileFont(v)
-    if v < 10000 then return fonts.big end
-    if v < 100000 then return fonts.med end
-    return fonts.small
+local function drawScoreBox(label, value, x, y, w, h)
+    love.graphics.setColor(BOARD_COLOR)
+    love.graphics.rectangle("fill", x, y, w, h, h * 0.12, h * 0.12)
+
+    love.graphics.setFont(font(h * 0.22))
+    love.graphics.setColor(0.93, 0.89, 0.85)
+    love.graphics.printf(label, x, round(y + h * 0.12), w, "center")
+
+    local text = tostring(value)
+    local f = fitFont(text, h * 0.42, w * 0.88)
+    love.graphics.setFont(f)
+    love.graphics.setColor(1, 1, 1)
+    love.graphics.printf(text, x, round(y + h * 0.4 + (h * 0.5 - f:getHeight()) / 2), w, "center")
 end
 
-local function drawHeader(board, best, w)
-    love.graphics.setColor(0.47, 0.43, 0.40)
-    love.graphics.setFont(fonts.big)
-    love.graphics.print("2048", GAP, 20)
-    love.graphics.setFont(fonts.small)
-    love.graphics.printf("SCORE " .. board.score, 0, 22, w - GAP, "right")
-    love.graphics.printf("BEST " .. best, 0, 46, w - GAP, "right")
+local function drawHeader(board, best, L)
+    local headerH = L.side * HEADER
+    local w, h, gap = L.side * 0.28, L.side * 0.13, L.side * 0.03
+    local y = round(L.y - headerH + (headerH - h) / 2)
+    local cx = L.x + L.side / 2
+    drawScoreBox("SCORE", board.score, round(cx - gap / 2 - w), y, w, h)
+    drawScoreBox("BEST", best, round(cx + gap / 2), y, w, h)
 end
 
-local function drawGrid(board, w)
-    love.graphics.setColor(0.73, 0.68, 0.63)
-    love.graphics.rectangle("fill", 0, TOP, w, w, 8, 8)
+local function drawGrid(board, L)
+    love.graphics.setColor(BOARD_COLOR)
+    love.graphics.rectangle("fill", L.x, L.y, L.side, L.side, L.gap * 0.66, L.gap * 0.66)
     for r = 1, board.size do
         for c = 1, board.size do
             local v = board.cells[r][c]
-            local x = GAP + (c - 1) * (TILE + GAP)
-            local y = TOP + GAP + (r - 1) * (TILE + GAP)
+            local x = round(L.x + L.gap + (c - 1) * (L.tile + L.gap))
+            local y = round(L.y + L.gap + (r - 1) * (L.tile + L.gap))
             love.graphics.setColor(tileColor(v))
-            love.graphics.rectangle("fill", x, y, TILE, TILE, 6, 6)
+            love.graphics.rectangle("fill", x, y, L.tile, L.tile, L.gap * 0.5, L.gap * 0.5)
             if v > 0 then
-                local font = tileFont(v)
-                love.graphics.setFont(font)
+                local text = tostring(v)
+                local f = fitFont(text, L.tile * 0.45, L.tile * 0.82)
+                love.graphics.setFont(f)
                 love.graphics.setColor(textColor(v))
-                love.graphics.printf(tostring(v), x, y + (TILE - font:getHeight()) / 2, TILE, "center")
+                love.graphics.printf(text, x, round(y + (L.tile - f:getHeight()) / 2), L.tile, "center")
             end
         end
     end
 end
 
-local function drawOverlay(title, subtitle, w)
+local function drawOverlay(title, subtitle, L)
     love.graphics.setColor(0.98, 0.97, 0.94, 0.75)
-    love.graphics.rectangle("fill", 0, TOP, w, w, 8, 8)
-    love.graphics.setColor(0.47, 0.43, 0.40)
-    love.graphics.setFont(fonts.big)
-    love.graphics.printf(title, 0, TOP + w / 2 - 40, w, "center")
-    love.graphics.setFont(fonts.small)
-    love.graphics.printf(subtitle, 0, TOP + w / 2 + 10, w, "center")
+    love.graphics.rectangle("fill", L.x, L.y, L.side, L.side, L.gap * 0.66, L.gap * 0.66)
+    love.graphics.setColor(TEXT_COLOR)
+    local titleFont = font(L.side * 0.085)
+    love.graphics.setFont(titleFont)
+    love.graphics.printf(title, L.x, round(L.y + L.side / 2 - titleFont:getHeight()), L.side, "center")
+    love.graphics.setFont(fitFont(subtitle, L.side * 0.036, L.side * 0.9))
+    love.graphics.printf(subtitle, L.x, round(L.y + L.side * 0.52), L.side, "center")
 end
 
 function Render.draw(board, best, showWin)
-    local w = board.size * TILE + (board.size + 1) * GAP
-    drawHeader(board, best, w)
-    drawGrid(board, w)
+    local L = layout(board)
+    drawHeader(board, best, L)
+    drawGrid(board, L)
     if board.over then
-        drawOverlay("Game over :(", "Press R to restart", w)
+        drawOverlay("Game over :(", "Press R to restart", L)
     elseif showWin then
-        drawOverlay("You Win!!", "Press C to keep playing, R to restart", w)
+        drawOverlay("You Win!!", "Press C to keep playing, R to restart", L)
     end
 end
 

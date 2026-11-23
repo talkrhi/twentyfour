@@ -12,6 +12,13 @@ local keyMap = {
     down = "down", s = "down",
 }
 
+local function fitWindowToScreen()
+    local dw, dh = love.window.getDesktopDimensions()
+    local w, h = math.floor(dw * 0.9), math.floor(dh * 0.8)
+    love.window.updateMode(w, h)
+    love.window.setPosition(math.floor((dw - w) / 2), math.floor((dh - h) / 2))
+end
+
 local function restart()
     board:reset()
     keepPlaying = false
@@ -21,6 +28,11 @@ function love.load()
     love.math.setRandomSeed(os.time())
     Render.load()
     board = Board.new(4)
+    fitWindowToScreen()
+end
+
+function love.resize()
+    Render.resize()
 end
 
 function love.keypressed(key)
@@ -28,6 +40,8 @@ function love.keypressed(key)
         love.event.quit()
     elseif key == "r" then
         restart()
+    elseif key == "f" then
+        love.window.setFullscreen(not love.window.getFullscreen(), "desktop")
     elseif board.won and not keepPlaying then
         if key == "c" then keepPlaying = true end
     elseif keyMap[key] then
