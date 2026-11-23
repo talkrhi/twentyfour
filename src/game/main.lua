@@ -22,13 +22,19 @@ end
 local function restart()
     board:reset()
     keepPlaying = false
+    Render.animate(board.events)
 end
 
 function love.load()
     love.math.setRandomSeed(os.time())
     Render.load()
     board = Board.new(4)
+    Render.animate(board.events)
     fitWindowToScreen()
+end
+
+function love.update(dt)
+    Render.update(dt)
 end
 
 function love.resize()
@@ -45,7 +51,7 @@ function love.keypressed(key)
     elseif board.won and not keepPlaying then
         if key == "c" then keepPlaying = true end
     elseif keyMap[key] then
-        board:move(keyMap[key])
+        if board:move(keyMap[key]) then Render.animate(board.events) end
         if board.score > best then best = board.score end
     end
 end
