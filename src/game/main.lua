@@ -3,7 +3,13 @@ local Render = require("render")
 
 local board
 local best = 0
+local startBest = 0
 local keepPlaying = false
+local MENUS = {
+    over = {"Retry", "Quit"},
+    win = {"Keep playing", "Retry", "Quit"},
+}
+local menu = {items = MENUS.over, selected = 1, newBest = false}
 
 local keyMap = {
     left = "left", a = "left",
@@ -22,18 +28,39 @@ end
 local function restart()
     board:reset()
     keepPlaying = false
+    startBest = best
+    menu.selected = 1
     Render.animate(board.events)
+end
+
+local function activeMenu()
+    if board.won and not keepPlaying then return MENUS.win end
+    if board.over then return MENUS.over end
+end
+
+local function choose(i)
+    local item = menu.items[i]
+    if item == "Keep playing" then
+        keepPlaying = true
+    elseif item == "Retry" then
+        restart()
+    elseif item == "Quit" then
+        love.event.quit()
+    end
 end
 
 function love.load()
     love.math.setRandomSeed(os.time())
-    Render.load()
     board = Board.new(4)
     Render.animate(board.events)
     fitWindowToScreen()
 end
 
 function love.update(dt)
+    local items = activeMenu()
+    if items and items ~= menu.items then
+        menu.items, menu.selected = items, 1
+    end
     Render.update(dt)
 end
 
@@ -48,14 +75,36 @@ function love.keypressed(key)
         restart()
     elseif key == "f" then
         love.window.setFullscreen(not love.window.getFullscreen(), "desktop")
-    elseif board.won and not keepPlaying then
-        if key == "c" then keepPlaying = true end
+    elseif key == "t" then
+        Render.nextTheme()
+    elseif activeMenu() then
+        if key == "c" and menu.items == MENUS.win then
+            keepPlaying = true
+        elseif key == "up" or key == "w" then
+            menu.selected = (menu.selected - 2) % #menu.items + 1
+        elseif key == "down" or key == "s" then
+            menu.selected = menu.selected % #menu.items + 1
+        elseif key == "return" or key == "kpenter" or key == "space" then
+            choose(menu.selected)
+        end
     elseif keyMap[key] then
         if board:move(keyMap[key]) then Render.animate(board.events) end
-        if board.score > best then best = board.score end
+        best = math.max(best, board.score)
     end
 end
 
+function love.mousemoved(x, y)
+    if activeMenu() then
+        menu.selected = Render.menuItemAt(x, y) or menu.selected
+    end
+end
+
+function love.mousepressed(x, y, button)
+    local i = activeMenu() and button == 1 and Render.menuItemAt(x, y)
+    if i then choose(i) end
+end
+
 function love.draw()
-    Render.draw(board, best, board.won and not keepPlaying)
+    menu.newBest = board.score > startBest
+    Render.draw(board, best, board.won and not keepPlaying, menu)
 end
